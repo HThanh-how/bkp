@@ -61,10 +61,11 @@ export default Vue.extend({
   computed: {
   },
   mounted() {
-    window.main.onUpdateEvent('update-available', this.notifyUpdate)
-    window.main.onUpdateEvent('manual-update', this.notifyManual)
-    window.main.onUpdateEvent('update-downloaded', this.notifyDownloaded)
-    window.main.updaterReady();
+    // Auto-update disabled for free version
+    // window.main.onUpdateEvent('update-available', this.notifyUpdate)
+    // window.main.onUpdateEvent('manual-update', this.notifyManual)
+    // window.main.onUpdateEvent('update-downloaded', this.notifyDownloaded)
+    // window.main.updaterReady();
   },
   methods: {
     closeAll() {

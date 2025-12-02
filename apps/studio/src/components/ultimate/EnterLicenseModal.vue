@@ -29,12 +29,12 @@
           </p>
           <error-alert :error=" error" />
           <div class="form-group">
-            <label for="email">License Name</label>
-            <input type="text" v-model="email">
+            <label for="email">Email</label>
+            <input type="email" v-model="email" required>
           </div>
           <div class="form-group">
             <label for="key">License Key</label>
-            <input type="text" v-model="key">
+            <input type="text" v-model="key" placeholder="Enter any key">
           </div>
         </div>
       </div>
@@ -59,7 +59,8 @@ import _ from 'lodash'
 export default Vue.extend({
   components: { ErrorAlert, LicenseInformation },
   data: () => ({
-    email: null, key: null,
+    email: null,
+    key: null,
     error: null
   }),
   mounted() {
@@ -100,7 +101,7 @@ export default Vue.extend({
     },
     async submitLicense() {
       try {
-        await this.$store.dispatch('licenses/add', { email: this.email, key: this.key })
+        await this.$store.dispatch('licenses/add', { email: this.email, key: this.key || 'premium' })
         this.$noty.success("License registered, thanks for supporting Beekeeper Studio.")
         this.$modal.hide('license')
         this.$store.dispatch('licenseEntered')

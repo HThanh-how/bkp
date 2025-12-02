@@ -152,8 +152,8 @@ async function initBasics() {
   menuHandler = new MenuHandler(electron, settings, bksConfig)
   menuHandler.initialize()
   log.debug("Building the window")
-  log.debug("managing updates")
-  manageUpdates(settings.useBeta.valueAsBool)
+  log.debug("managing updates - disabled for free version")
+  // manageUpdates(settings.useBeta.valueAsBool) // Disabled - users download manually
   ipcMain.on(AppEvent.openExternally, (_e: electron.IpcMainEvent, args: any[]) => {
     const url = args[0]
     if (!url) return

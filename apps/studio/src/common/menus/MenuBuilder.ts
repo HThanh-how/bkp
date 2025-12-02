@@ -44,7 +44,7 @@ export default class extends DefaultMenu {
       label: "Help",
       submenu: [
         this.menuItems.enterLicense,
-        this.menuItems.checkForUpdate,
+        // this.menuItems.checkForUpdate, // Disabled for free version
         this.menuItems.opendocs,
         this.menuItems.support,
         this.menuItems.addBeekeeper,

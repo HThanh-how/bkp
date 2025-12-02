@@ -94,7 +94,8 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
   }
 
   checkForUpdates(_menuItem: Electron.MenuItem, _win: Electron.BrowserWindow): void {
-    autoUpdater.checkForUpdates()
+    // Auto-update disabled for free version
+    // autoUpdater.checkForUpdates()
   }
 
   devtools(_1: Electron.MenuItem, win: ElectronWindow): void {
@@ -200,7 +201,7 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
       window.send(AppEvent.settingsChanged)
     })
     setAllowBeta(this.settings.useBeta.value as boolean);
-    autoUpdater.checkForUpdates();
+    // autoUpdater.checkForUpdates(); // Disabled for free version
   }
 
   managePlugins = (_menuItem: Electron.MenuItem, win: ElectronWindow): void => {

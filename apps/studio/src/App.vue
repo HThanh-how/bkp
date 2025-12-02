@@ -104,7 +104,6 @@ export default Vue.extend({
     return {
       url: null,
       interval: null,
-      licenseInterval: null,
       runningWayland: false,
     }
   },
@@ -145,16 +144,10 @@ export default Vue.extend({
   },
   async beforeDestroy() {
     clearInterval(this.interval)
-    clearInterval(this.licenseInterval)
   },
   async mounted() {
     this.notifyFreeTrial()
     this.interval = setInterval(this.notifyFreeTrial, globals.trialNotificationInterval)
-    this.$store.dispatch('licenses/updateAll');
-    this.licenseInterval = setInterval(
-      () => this.$store.dispatch('licenses/updateAll'),
-      globals.licenseCheckInterval
-    )
     const query = querystring.parse(window.location.search, { parseBooleans: true })
     if (query) {
       this.url = query.url || null

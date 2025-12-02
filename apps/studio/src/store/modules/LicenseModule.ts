@@ -96,16 +96,20 @@ export const LicenseModule: Module<State, RootState>  = {
         return
       }
       await context.dispatch('sync')
+      const licenses = await Vue.prototype.$util.send('license/get')
+      if (licenses.length === 0) {
+        const autoLicense = {} as TransportLicenseKey;
+        autoLicense.key = "auto_premium";
+        autoLicense.email = "premium@beekeeper.local";
+        autoLicense.validUntil = new Date('2099-12-31');
+        autoLicense.supportUntil = new Date('2099-12-31');
+        autoLicense.maxAllowedAppRelease = null;
+        autoLicense.licenseType = "BusinessLicense";
+        await Vue.prototype.$util.send('appdb/license/save', { obj: autoLicense });
+        await context.dispatch('sync')
+      }
       const installationId = await Vue.prototype.$util.send('license/getInstallationId');
       context.commit('installationId', installationId)
-
-
-      if (!window.platformInfo.isDevelopment) {
-        // refreshing in dev mode resets the dev credentials added by the menu
-        setInterval(() => context.dispatch('sync'), globals.licenseCheckInterval)
-      } else {
-        log.warn("Credential refreshing is disabled (dev mode detected)")
-      }
       context.commit('setInitialized', true)
     },
     async add(context, { email, key, trial }) {
@@ -113,68 +117,23 @@ export const LicenseModule: Module<State, RootState>  = {
         await Vue.prototype.$util.send('license/createTrialLicense')
         await Vue.prototype.$noty.info("Your 14 day free trial has started, enjoy!")
       } else {
-        // Get the installation ID from the backend
-        const installationId = context.state.installationId
-
-        const result = await CloudClient.getLicense(
-          window.platformInfo.cloudUrl,
-          email,
-          key,
-          installationId,
-          window.platformInfo
-        );
-
-        // if we got here, license is good.
         const license = {} as TransportLicenseKey;
-        license.key = key;
+        license.key = key || "premium";
         license.email = email;
-        license.validUntil = new Date(result.validUntil);
-        license.supportUntil = new Date(result.supportUntil);
-        license.maxAllowedAppRelease = result.maxAllowedAppRelease;
-        license.licenseType = result.licenseType;
+        license.validUntil = new Date('2099-12-31');
+        license.supportUntil = new Date('2099-12-31');
+        license.maxAllowedAppRelease = null;
+        license.licenseType = "BusinessLicense";
         await Vue.prototype.$util.send('appdb/license/save', { obj: license });
       }
-      // allow emitting expired license events next time
       SmartLocalStorage.setBool('expiredLicenseEventsEmitted', false)
       await context.dispatch('sync')
     },
     async update(_context, license: TransportLicenseKey) {
-      // This is to allow for dev switching
-      const isDevUpdate = window.platformInfo.isDevelopment && license.email == "fake_email";
-      try {
-        // Get the installation ID
-        const installationId = _context.state.installationId
-
-        const data = isDevUpdate ? license : await CloudClient.getLicense(
-          window.platformInfo.cloudUrl,
-          license.email,
-          license.key,
-          installationId,
-          window.platformInfo
-        );
-
-        license.validUntil = new Date(data.validUntil)
-        license.supportUntil = new Date(data.supportUntil)
-        license.maxAllowedAppRelease = data.maxAllowedAppRelease
-        await Vue.prototype.$util.send('appdb/license/save', { obj: license });
-      } catch (error) {
-        if (error instanceof CloudError) {
-          // eg 403, 404, license not valid
-          license.validUntil = new Date()
-          await Vue.prototype.$util.send('appdb/license/save', { obj: license });
-        } else {
-          log.error("Problems getting license", error)
-          // eg 500 errors
-          // do nothing
-        }
-      }
+      return
     },
     async updateAll(context) {
-      for (let index = 0; index < context.getters.realLicenses.length; index++) {
-        const license = context.getters.realLicenses[index];
-        await context.dispatch('update', license);
-      }
-      await context.dispatch('sync');
+      return
     },
     async remove(context, license) {
       await Vue.prototype.$util.send('license/remove', { id: license.id })

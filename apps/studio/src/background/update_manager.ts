@@ -48,7 +48,12 @@ export function setAllowBeta(allowBeta: boolean) {
 }
 
 export function manageUpdates(allowBeta: boolean, debug?: boolean): void {
+  // Auto-update disabled for free version - users download manually
+  log.info("Auto-update disabled for free version")
+  return
 
+  // Original code commented out
+  /*
   if (platformInfo.environment === 'development' || platformInfo.isSnap || (platformInfo.isLinux && !platformInfo.isAppImage)) {
     log.info("not doing any updates, didn't meet conditional")
     return
@@ -91,4 +96,5 @@ export function manageUpdates(allowBeta: boolean, debug?: boolean): void {
   setInterval(() => {
     checkForUpdates()
   }, BksConfig.general.checkForUpdatesInterval)
+  */
 }
