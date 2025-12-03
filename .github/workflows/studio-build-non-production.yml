@@ -117,6 +117,7 @@ jobs:
         shell: bash
 
       - name: Generate changelog
+        if: "!startsWith(matrix.os, 'windows')"
         id: generate_changelog
         run: |
           LATEST_RELEASE="${{ steps.get_latest_release.outputs.latest_release }}"
@@ -138,6 +139,34 @@ jobs:
           echo "## Changelog" > apps/studio/build/release-notes.md
           echo "" >> apps/studio/build/release-notes.md
           echo "$CHANGELOG" >> apps/studio/build/release-notes.md
+        shell: bash
+
+      - name: Generate changelog (Windows)
+        if: "startsWith(matrix.os, 'windows')"
+        id: generate_changelog
+        shell: powershell
+        run: |
+          $latestRelease = "${{ steps.get_latest_release.outputs.latest_release }}"
+          $currentCommit = git rev-parse HEAD
+          
+          Write-Output "Generating changelog from $latestRelease to $currentCommit"
+          
+          $changelog = git log --pretty=format:"- %s (%h)" "$latestRelease..HEAD" --no-merges
+          
+          if (-not $changelog) {
+            $changelog = "- No changes since last release"
+          }
+          
+          Write-Output "changelog<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output $changelog | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          Write-Output "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          
+          New-Item -ItemType Directory -Force -Path apps/studio/build | Out-Null
+          @"
+          ## Changelog
+          
+          $changelog
+          "@ | Out-File -FilePath apps/studio/build/release-notes.md -Encoding utf8
 
       - name: Update repository in package.json
         run: |
