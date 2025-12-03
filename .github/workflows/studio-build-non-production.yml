@@ -260,3 +260,63 @@ jobs:
           path: apps/studio/dist_electron
           retention-days: 30
           if-no-files-found: warn
+
+  create-release:
+    needs: masterbuild
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: success()
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+        with:
+          fetch-tags: true
+
+      - name: Get beta version
+        id: get_version
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' apps/studio/package.json)
+          COMMIT_SHA=$(git rev-parse --short=8 HEAD)
+          if [[ ! "$CURRENT_VERSION" =~ -beta ]]; then
+            BETA_VERSION="${CURRENT_VERSION}-beta.${COMMIT_SHA}"
+          else
+            BETA_VERSION="$CURRENT_VERSION"
+          fi
+          TAG_NAME="v${BETA_VERSION}"
+          echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Beta version: $BETA_VERSION"
+          echo "Tag: $TAG_NAME"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Read changelog
+        id: changelog
+        run: |
+          if [ -f "apps/studio/build/release-notes.md" ]; then
+            CHANGELOG=$(cat apps/studio/build/release-notes.md)
+          else
+            CHANGELOG="## Changelog\n\n- Beta build from commit ${{ github.sha }}"
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: Release ${{ steps.get_version.outputs.tag }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: true
+          files: |
+            artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
