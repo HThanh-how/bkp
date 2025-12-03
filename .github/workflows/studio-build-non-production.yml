@@ -95,7 +95,6 @@ jobs:
           npm_config_node_gyp: ${{ github.workspace }}${{ runner.os == 'Windows' && '\node_modules\node-gyp\bin\node-gyp.js' || '/node_modules/node-gyp/bin/node-gyp.js' }}
 
       - name: Get latest successful release
-        if: "!startsWith(matrix.os, 'windows')"
         id: get_latest_release
         run: |
           LATEST_RELEASE=$(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.draft == false and .prerelease == true) | .tag_name' | head -n 1)
@@ -114,33 +113,9 @@ jobs:
           fi
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
           echo "Found latest release: $LATEST_RELEASE"
-
-      - name: Get latest successful release (Windows)
-        if: "startsWith(matrix.os, 'windows')"
-        id: get_latest_release
-        shell: powershell
-        run: |
-          $releases = gh api repos/${{ github.repository }}/releases | ConvertFrom-Json
-          $latestRelease = $releases | Where-Object { $_.draft -eq $false -and $_.prerelease -eq $true } | Select-Object -First 1
-          if (-not $latestRelease) {
-            $latestRelease = $releases | Where-Object { $_.draft -eq $false } | Select-Object -First 1
-          }
-          if (-not $latestRelease) {
-            $tags = git tag --sort=-creatordate | Select-String -Pattern '^v[0-9]+\.[0-9]+\.[0-9]+' | Select-Object -First 1
-            if ($tags) {
-              $latestRelease = @{ tag_name = $tags.Line }
-            }
-          }
-          if (-not $latestRelease) {
-            $firstCommit = git rev-list --max-parents=0 HEAD
-            $latestRelease = @{ tag_name = $firstCommit }
-          }
-          $tagName = $latestRelease.tag_name
-          Write-Output "latest_release=$tagName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output "Found latest release: $tagName"
+        shell: bash
 
       - name: Generate changelog
-        if: "!startsWith(matrix.os, 'windows')"
         id: generate_changelog
         run: |
           LATEST_RELEASE="${{ steps.get_latest_release.outputs.latest_release }}"
@@ -162,33 +137,6 @@ jobs:
           echo "## Changelog" > apps/studio/build/release-notes.md
           echo "" >> apps/studio/build/release-notes.md
           echo "$CHANGELOG" >> apps/studio/build/release-notes.md
-
-      - name: Generate changelog (Windows)
-        if: "startsWith(matrix.os, 'windows')"
-        id: generate_changelog
-        shell: powershell
-        run: |
-          $latestRelease = "${{ steps.get_latest_release.outputs.latest_release }}"
-          $currentCommit = git rev-parse HEAD
-          
-          Write-Output "Generating changelog from $latestRelease to $currentCommit"
-          
-          $changelog = git log --pretty=format:"- %s (%h)" "$latestRelease..HEAD" --no-merges
-          
-          if (-not $changelog) {
-            $changelog = "- No changes since last release"
-          }
-          
-          Write-Output "changelog<<EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output $changelog | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          Write-Output "EOF" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-          
-          New-Item -ItemType Directory -Force -Path apps/studio/build | Out-Null
-          @"
-          ## Changelog
-          
-          $changelog
-          "@ | Out-File -FilePath apps/studio/build/release-notes.md -Encoding utf8
 
       - name: Set beta version
         if: "!startsWith(matrix.os, 'windows')"
