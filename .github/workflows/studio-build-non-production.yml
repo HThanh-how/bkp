@@ -143,7 +143,7 @@ jobs:
 
       - name: Generate changelog (Windows)
         if: "startsWith(matrix.os, 'windows')"
-        id: generate_changelog
+        id: generate_changelog_win
         shell: powershell
         run: |
           $latestRelease = "${{ steps.get_latest_release.outputs.latest_release }}"
