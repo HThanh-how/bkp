@@ -141,6 +141,12 @@ jobs:
           echo "" >> apps/studio/build/release-notes.md
           echo "$CHANGELOG" >> apps/studio/build/release-notes.md
 
+      - name: Update repository in package.json
+        run: |
+          GITHUB_URL="git@github.com:${{ github.repository }}.git"
+          jq --arg url "$GITHUB_URL" '.repository = $url' apps/studio/package.json > tmp.json && mv tmp.json apps/studio/package.json
+          echo "Updated repository to: $GITHUB_URL"
+
       - name: Set beta version
         if: "!startsWith(matrix.os, 'windows')"
         run: |
