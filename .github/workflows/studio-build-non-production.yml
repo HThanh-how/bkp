@@ -169,10 +169,22 @@ jobs:
           "@ | Out-File -FilePath apps/studio/build/release-notes.md -Encoding utf8
 
       - name: Update repository in package.json
+        if: "!startsWith(matrix.os, 'windows')"
         run: |
           GITHUB_URL="git@github.com:${{ github.repository }}.git"
           jq --arg url "$GITHUB_URL" '.repository = $url' apps/studio/package.json > tmp.json && mv tmp.json apps/studio/package.json
           echo "Updated repository to: $GITHUB_URL"
+        shell: bash
+
+      - name: Update repository in package.json (Windows)
+        if: "startsWith(matrix.os, 'windows')"
+        shell: powershell
+        run: |
+          $githubUrl = "git@github.com:${{ github.repository }}.git"
+          $packageJson = Get-Content apps/studio/package.json | ConvertFrom-Json
+          $packageJson.repository = $githubUrl
+          $packageJson | ConvertTo-Json -Depth 10 | Set-Content apps/studio/package.json
+          Write-Output "Updated repository to: $githubUrl"
 
       - name: Set beta version
         if: "!startsWith(matrix.os, 'windows')"
