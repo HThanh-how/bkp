@@ -15,8 +15,6 @@ concurrency:
 jobs:
   masterbuild:
     runs-on: ${{ matrix.os }}
-    permissions:
-      contents: write
 
     strategy:
       matrix:
@@ -177,24 +175,22 @@ jobs:
           }
 
       - name: Build Electron app (Beta)
-        run: "yarn run electron:build --publish always"
+        run: "yarn run electron:build --publish never"
         if: startsWith(matrix.os, 'ubuntu') == false
         env:
           PYTHON_PATH: "${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHON_PATH' }}"
           PYTHONPATH: "${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHONPATH' }}"
           SNAPCRAFT_BUILD_ENVIRONMENT: 'lxd'
           USE_SYSTEM_FPM: true
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Electron app (Beta - Linux AppImage)
-        run: "yarn run electron:build --publish always --linux AppImage"
+        run: "yarn run electron:build --publish never --linux AppImage"
         if: startsWith(matrix.os, 'ubuntu')
         env:
           PYTHON_PATH: "${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHON_PATH' }}"
           PYTHONPATH: "${{ startsWith(matrix.os, 'macos') && '/opt/homebrew/opt/python@3.11/libexec/bin/python3' || '$PYTHONPATH' }}"
           SNAPCRAFT_BUILD_ENVIRONMENT: 'lxd'
           USE_SYSTEM_FPM: true
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cleanup artifacts
         if: "!startsWith(matrix.os, 'windows')"
