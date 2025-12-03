@@ -97,18 +97,12 @@ jobs:
       - name: Get latest successful release
         id: get_latest_release
         run: |
-          LATEST_RELEASE=$(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.draft == false and .prerelease == true) | .tag_name' | head -n 1)
-          if [ -z "$LATEST_RELEASE" ]; then
-            LATEST_RELEASE=$(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.draft == false) | .tag_name' | head -n 1)
-          fi
-          if [ -z "$LATEST_RELEASE" ]; then
-            LATEST_TAG=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
-            if [ -n "$LATEST_TAG" ]; then
-              LATEST_RELEASE="$LATEST_TAG"
-            fi
-          fi
-          if [ -z "$LATEST_RELEASE" ]; then
-            echo "No previous release found, using first commit"
+          git fetch --tags --force
+          LATEST_TAG=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+          if [ -n "$LATEST_TAG" ]; then
+            LATEST_RELEASE="$LATEST_TAG"
+          else
+            echo "No previous release tag found, using first commit"
             LATEST_RELEASE=$(git rev-list --max-parents=0 HEAD)
           fi
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
@@ -176,7 +170,6 @@ jobs:
           SNAPCRAFT_BUILD_ENVIRONMENT: 'lxd'
           USE_SYSTEM_FPM: true
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_NOTES: ${{ steps.generate_changelog.outputs.changelog }}
 
       - name: Build Electron app (Beta - Linux AppImage)
         run: "yarn run electron:build --publish always --linux AppImage"
@@ -187,7 +180,6 @@ jobs:
           SNAPCRAFT_BUILD_ENVIRONMENT: 'lxd'
           USE_SYSTEM_FPM: true
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_NOTES: ${{ steps.generate_changelog.outputs.changelog }}
 
       - name: Cleanup artifacts
         if: "!startsWith(matrix.os, 'windows')"
