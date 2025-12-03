@@ -245,8 +245,18 @@ jobs:
         run: |
           Get-ChildItem -Path "apps\studio\dist_electron" -File | Where-Object { $_.Extension -ne ".exe" -and $_.Extension -ne ".yml" } | Remove-Item -Force
 
+      - name: List build artifacts
+        run: |
+          echo "Listing files in dist_electron:"
+          ls -la apps/studio/dist_electron || dir apps\studio\dist_electron
+        shell: bash
+        continue-on-error: true
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
+        if: success() || failure()
         with:
           name: ${{ matrix.os }}
           path: apps/studio/dist_electron
+          retention-days: 30
+          if-no-files-found: warn
