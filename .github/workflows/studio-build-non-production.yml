@@ -98,15 +98,20 @@ jobs:
       - name: Get latest successful release
         id: get_latest_release
         run: |
-          LATEST_TAG=$(git tag --sort=-creatordate | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "")
+          LATEST_TAG=$(git tag --sort=-creatordate 2>/dev/null | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -n 1 || echo "")
           if [ -n "$LATEST_TAG" ]; then
             LATEST_RELEASE="$LATEST_TAG"
+            echo "Found latest release tag: $LATEST_RELEASE"
           else
             echo "No previous release tag found, using first commit"
-            LATEST_RELEASE=$(git rev-list --max-parents=0 HEAD)
+            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD 2>/dev/null | head -n 1)
+            if [ -z "$FIRST_COMMIT" ]; then
+              FIRST_COMMIT=$(git rev-parse HEAD)
+            fi
+            LATEST_RELEASE="$FIRST_COMMIT"
+            echo "Using first commit: $LATEST_RELEASE"
           fi
           echo "latest_release=$LATEST_RELEASE" >> $GITHUB_OUTPUT
-          echo "Found latest release: $LATEST_RELEASE"
         shell: bash
 
       - name: Generate changelog
