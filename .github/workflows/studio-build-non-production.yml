@@ -323,7 +323,7 @@ jobs:
             artifacts/**/Beekeeper*.snap
             artifacts/**/Beekeeper*.deb
             artifacts/**/Beekeeper*.rpm
-            artifacts/**/*.yml
+            artifacts/**/latest*.yml
             artifacts/**/*.blockmap
             artifacts/**/Beekeeper*.zip
         env:
