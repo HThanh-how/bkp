@@ -18,7 +18,8 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-14, ubuntu-22.04, windows-2022, ubuntu-22.04-arm64]
+        # Tạm thời comment ubuntu-22.04-arm64 vì đang bị treo
+        os: [macos-14, ubuntu-22.04, windows-2022] #, ubuntu-22.04-arm64]
 
     steps:
       - name: Check out Git repository
