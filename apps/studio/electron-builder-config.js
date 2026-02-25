@@ -160,6 +160,9 @@ module.exports = {
     },
     publish: ['github']
   },
+  pacman: {
+    depends: ["c-ares", "ffmpeg", "gtk3", "llhttp", "libevent", "libvpx", "libxslt", "libxss", "minizip", "nss", "re2", "snappy", "libnotify", "libappindicator-gtk3"]
+  },
   deb: {
     publish: [
       'github'

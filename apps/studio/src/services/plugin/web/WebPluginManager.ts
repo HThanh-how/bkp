@@ -6,6 +6,8 @@ import WebPluginLoader from "./WebPluginLoader";
 import { ContextOption } from "@/plugins/BeekeeperPlugin";
 import { PluginNotificationData, PluginViewContext } from "@beekeeperstudio/plugin";
 import { FileHelpers } from "@/types";
+import type Noty from "noty";
+import { WebPluginCommandExecutor } from "./WebPluginCommandExecutor";
 
 const log = rawLog.scope("WebPluginManager");
 
@@ -14,6 +16,13 @@ export type WebPluginManagerParams = {
   pluginStore: PluginStoreService;
   appVersion: string;
   fileHelpers: FileHelpers;
+  noty: {
+    success(text: string): Noty;
+    error(text: string): Noty;
+    warning(text: string): Noty;
+    info(text: string): Noty;
+  };
+  confirm(title?: string, message?: string, options?: { confirmLabel?: string, cancelLabel?: string }): Promise<boolean>;
 }
 
 /**
@@ -49,12 +58,16 @@ export default class WebPluginManager {
   public readonly pluginStore: PluginStoreService;
   public readonly appVersion: string;
   public readonly fileHelpers: FileHelpers;
+  private readonly noty: WebPluginManagerParams['noty'];
+  private readonly confirm: WebPluginManagerParams['confirm'];
 
   constructor(params: WebPluginManagerParams) {
     this.utilityConnection = params.utilityConnection;
     this.pluginStore = params.pluginStore;
     this.appVersion = params.appVersion;
-    this.fileHelpers = params.fileHelpers
+    this.fileHelpers = params.fileHelpers;
+    this.noty = params.noty;
+    this.confirm = params.confirm;
   }
 
   async initialize() {
@@ -181,6 +194,13 @@ export default class WebPluginManager {
     return loader.buildEntryUrl(entry);
   }
 
+  async viewEntrypointExists(pluginId: string, viewId: string): Promise<boolean> {
+    return await this.utilityConnection.send("plugin/viewEntrypointExists", {
+      pluginId,
+      viewId,
+    });
+  }
+
   /**
    * Subscribe to view requests from a specific plugin. Inspired by Pinia's `$onAction`.
    *
@@ -243,6 +263,18 @@ export default class WebPluginManager {
     return loader.onDispose(fn);
   }
 
+  execute(pluginId: string, command: string) {
+    const loader = this.loaders.get(pluginId);
+    if (!loader) {
+      throw new Error(
+        `Attempting to execute a command on a plugin that is not loaded. (pluginId: ${pluginId})`
+      );
+    }
+    const executor = new WebPluginCommandExecutor(loader.context);
+    executor.execute(command);
+  }
+
+
   private async loadPlugin(manifest: Manifest) {
     if (this.loaders.has(manifest.id)) {
       log.warn(`Plugin "${manifest.id}" already loaded. Skipping...`);
@@ -256,6 +288,8 @@ export default class WebPluginManager {
       log: rawLog.scope(`Plugin:${manifest.id}`),
       appVersion: this.appVersion,
       fileHelpers: this.fileHelpers,
+      noty: this.noty,
+      confirm: this.confirm,
     });
     await loader.load();
     this.loaders.set(manifest.id, loader);

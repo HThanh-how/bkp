@@ -2,7 +2,8 @@ import type { RequestPayload, ResponsePayload } from "@beekeeperstudio/plugin/di
 import PluginStoreService from "./web/PluginStoreService";
 import rawLog from "@bksLogger";
 import type { UtilityConnection } from "@/lib/utility/UtilityConnection";
-import { FileHelpers } from "@/types";
+import { FileHelpers, JsonValue } from "@/types";
+import type Noty from "noty";
 
 /**
  * The kind of the tab. There is only one kind currently:
@@ -73,6 +74,14 @@ export interface PluginMenuItem {
    * @todo planned */
   order?: number;
 }
+
+/** For NativeMenuBuilder.ts */
+export type NativePluginMenuItem = {
+  id: string;
+  pluginId: string;
+  label: string;
+  command: string;
+};
 
 /** Used by earlier versions of AI Shell. */
 type LegacyViews = {
@@ -179,6 +188,13 @@ export type WebPluginContext = {
   log: ReturnType<typeof rawLog.scope>;
   appVersion: string;
   fileHelpers: FileHelpers;
+  noty: {
+    success(text: string, options?: any): Noty;
+    error(text: string, options?: any): Noty;
+    warning(text: string, options?: any): Noty;
+    info(text: string, options?: any): Noty;
+  };
+  confirm(title?: string, message?: string, options?: { confirmLabel?: string, cancelLabel?: string }): Promise<boolean>;
 }
 
 export type PluginContext = {
@@ -192,3 +208,10 @@ export type WebPluginViewInstance = {
   iframe: HTMLIFrameElement;
   context: any;
 }
+
+export type CreatePluginTabOptions = {
+  manifest: Manifest;
+  viewId: string;
+  params?: JsonValue;
+  command: string;
+};
