@@ -317,14 +317,14 @@ jobs:
           draft: false
           prerelease: true
           files: |
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*.AppImage
-            artifacts/**/*.snap
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
+            artifacts/**/Beekeeper*.exe
+            artifacts/**/Beekeeper*.dmg
+            artifacts/**/Beekeeper*.AppImage
+            artifacts/**/Beekeeper*.snap
+            artifacts/**/Beekeeper*.deb
+            artifacts/**/Beekeeper*.rpm
             artifacts/**/*.yml
             artifacts/**/*.blockmap
-            artifacts/**/*.zip
+            artifacts/**/Beekeeper*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
