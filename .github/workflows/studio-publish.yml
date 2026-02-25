@@ -90,7 +90,7 @@ jobs:
             type: linux
             setup_python: true
             clean_zfs: true
-          - name: macos-13
+          - name: macos-14-large
             arch: x64
             type: macos
           - name: macos-14
@@ -129,7 +129,7 @@ jobs:
         if: matrix.os.setup_ruby
 
       - name: Install fpm
-        run: sudo gem install fpm -v 1.15.1
+        run: sudo gem install fpm -v 1.17.0
         if: matrix.os.setup_ruby
 
       - name: Update repository
