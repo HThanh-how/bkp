@@ -210,17 +210,18 @@ jobs:
         if: "startsWith(matrix.os, 'windows')"
         shell: powershell
         run: |
-          $packageJson = Get-Content apps/studio/package.json | ConvertFrom-Json
-          $currentVersion = $packageJson.version
-          $commitSha = git rev-parse --short=8 HEAD
-          if ($currentVersion -notmatch '-beta') {
-            $betaVersion = "$currentVersion-beta.$commitSha"
-            $packageJson.version = $betaVersion
-            $packageJson | ConvertTo-Json -Depth 10 | Set-Content apps/studio/package.json
-            Write-Output "Updated version to: $betaVersion"
-          } else {
-            Write-Output "Version already has beta suffix: $currentVersion"
-          }
+          Write-Output "Skipping beta version rename on Windows to prevent yarn workspace resolution issues during pack."
+          # $packageJson = Get-Content apps/studio/package.json | ConvertFrom-Json
+          # $currentVersion = $packageJson.version
+          # $commitSha = git rev-parse --short=8 HEAD
+          # if ($currentVersion -notmatch '-beta') {
+          #   $betaVersion = "$currentVersion-beta.$commitSha"
+          #   $packageJson.version = $betaVersion
+          #   $packageJson | ConvertTo-Json -Depth 10 | Set-Content apps/studio/package.json
+          #   Write-Output "Updated version to: $betaVersion"
+          # } else {
+          #   Write-Output "Version already has beta suffix: $currentVersion"
+          # }
 
       - name: Build Electron app (Beta)
         run: "yarn run electron:build --publish never"
