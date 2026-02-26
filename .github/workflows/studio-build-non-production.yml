@@ -176,52 +176,14 @@ jobs:
           "@ | Out-File -FilePath apps/studio/build/release-notes.md -Encoding utf8
 
       - name: Update repository in package.json
-        if: "!startsWith(matrix.os, 'windows')"
-        run: |
-          GITHUB_URL="git@github.com:${{ github.repository }}.git"
-          jq --arg url "$GITHUB_URL" '.repository = $url' apps/studio/package.json > tmp.json && mv tmp.json apps/studio/package.json
-          echo "Updated repository to: $GITHUB_URL"
-        shell: bash
-
-      - name: Update repository in package.json (Windows)
-        if: "startsWith(matrix.os, 'windows')"
-        shell: powershell
-        run: |
-          $githubUrl = "git@github.com:${{ github.repository }}.git"
-          $packageJson = Get-Content apps/studio/package.json | ConvertFrom-Json
-          $packageJson.repository = $githubUrl
-          $packageJson | ConvertTo-Json -Depth 10 | Set-Content apps/studio/package.json
-          Write-Output "Updated repository to: $githubUrl"
-
-      - name: Set beta version
-        if: "!startsWith(matrix.os, 'windows')"
-        run: |
-          CURRENT_VERSION=$(jq -r '.version' apps/studio/package.json)
-          COMMIT_SHA=$(git rev-parse --short=8 HEAD)
-          if [[ ! "$CURRENT_VERSION" =~ -beta ]]; then
-            BETA_VERSION="${CURRENT_VERSION}-beta.${COMMIT_SHA}"
-            jq --arg v "$BETA_VERSION" '.version = $v' apps/studio/package.json > tmp.json && mv tmp.json apps/studio/package.json
-            echo "Updated version to: $BETA_VERSION"
-          else
-            echo "Version already has beta suffix: $CURRENT_VERSION"
-          fi
-
-      - name: Set beta version (Windows)
-        if: "startsWith(matrix.os, 'windows')"
-        shell: powershell
-        run: |
-          Write-Output "Skipping beta version rename on Windows to prevent yarn workspace resolution issues during pack."
-          # $packageJson = Get-Content apps/studio/package.json | ConvertFrom-Json
-          # $currentVersion = $packageJson.version
-          # $commitSha = git rev-parse --short=8 HEAD
-          # if ($currentVersion -notmatch '-beta') {
-          #   $betaVersion = "$currentVersion-beta.$commitSha"
-          #   $packageJson.version = $betaVersion
-          #   $packageJson | ConvertTo-Json -Depth 10 | Set-Content apps/studio/package.json
-          #   Write-Output "Updated version to: $betaVersion"
-          # } else {
-          #   Write-Output "Version already has beta suffix: $currentVersion"
-          # }
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'apps/studio/package.json';
+            const packageJson = JSON.parse(fs.readFileSync(path, 'utf8'));
+            packageJson.repository = 'git@github.com:${{ github.repository }}.git';
+            fs.writeFileSync(path, JSON.stringify(packageJson, null, 2) + '\n');
 
       - name: Build Electron app (Beta)
         run: "yarn run electron:build --publish never"
