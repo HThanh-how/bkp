@@ -1,0 +1,138 @@
+# Phân Tích: Tại Sao File Portable Exe Không Mở Được
+
+## Tổng Quan
+
+So sánh build của bạn (`HThanh-how/bkp`) với bản gốc (`beekeeper-studio/beekeeper-studio v5.5.7`), tôi tìm thấy **nhiều thay đổi quan trọng** có thể gây ra lỗi portable exe không chạy được.
+
+---
+
+## 🔴 Nguyên Nhân Chính Có Thể (Theo Thứ Tự Ưu Tiên)
+
+### 1. Nâng cấp lớn Electron (32 → 39) và electron-builder (25 → 26)
+
+```diff
+- "electron": "32.2.5",
+- "electron-builder": "~25.1.8",
++ "electron": "39.2.7",
++ "electron-builder": "~26.4.0",
+```
+
+> [!CAUTION]
+> Đây là thay đổi **cực kỳ lớn** - nhảy 7 phiên bản major Electron. Bản upstream gốc v5.5.7 dùng **Electron 32**, nhưng build của bạn dùng **Electron 39**. Điều này gây ra:
+> - Native modules (`better-sqlite3`, `ssh2`, `oracledb`...) cần rebuild cho đúng ABI của Electron 39
+> - API changes giữa Electron 32 → 39 có thể break app (deprecated APIs, removed features)
+> - electron-builder 26 có format packaging khác với 25
+
+### 2. Thay đổi `sqlanywhere` dependency
+
+```diff
+- "sqlanywhere": "beekeeper-studio/node-sqlanywhere#79af05a4...",
++ "sqlanywhere": "beekeeper-studio/node-sqlanywhere#54d1ef20...",
+```
+
+Native module này cần compile cho đúng phiên bản Electron. Commit hash khác nhau = binary khác nhau.
+
+### 3. `typeorm` nâng bản
+
+```diff
+- "typeorm": "^0.3.20",
++ "typeorm": "^0.3.26",
+```
+
+TypeORM quản lý app database (settings, licenses, connections). Nếu schema migration fail → app crash lúc khởi động.
+
+---
+
+## 🟡 Các Thay Đổi Code (License Bypass)
+
+Các thay đổi này **ít khả năng gây crash** nhưng cần lưu ý:
+
+### License bypass trong [LicenseKey.ts](file:///Users/huythanh/Code/bkp/apps/studio/src/common/appdb/models/LicenseKey.ts)
+- Bỏ toàn bộ validation logic, luôn trả edition = `"ultimate"`
+- Nếu không có license → tự tạo auto_premium license (valid đến 2099)
+
+### License bypass trong [LicenseModule.ts](file:///Users/huythanh/Code/bkp/apps/studio/src/store/modules/LicenseModule.ts)
+- [init()](file:///Users/huythanh/Code/bkp/apps/studio/src-commercial/entrypoints/main.ts#122-164): Tự tạo license nếu chưa có
+- `add()`: Bỏ qua CloudClient validation, tạo local license
+- `update()` / `updateAll()`: Return ngay, không làm gì
+
+### Auto-updater disabled (4 files)
+- [main.ts](file:///Users/huythanh/Code/bkp/apps/studio/src-commercial/entrypoints/main.ts) - Comment `manageUpdates()`
+- [update_manager.ts](file:///Users/huythanh/Code/bkp/apps/studio/src/background/update_manager.ts) - Return sớm
+- [NativeMenuActionHandlers.ts](file:///Users/huythanh/Code/bkp/apps/studio/src/background/NativeMenuActionHandlers.ts) - Comment `autoUpdater.checkForUpdates()`
+- [AutoUpdater.vue](file:///Users/huythanh/Code/bkp/apps/studio/src/components/AutoUpdater.vue) - Comment mounted hooks
+
+---
+
+## 🟢 Các Thay Đổi Nhỏ (Không Ảnh Hưởng)
+
+| File | Thay đổi |
+|------|----------|
+| `MenuBuilder.ts` | Thêm zoom numpad shortcuts |
+| `MenuItems.ts` | Thêm `zoominNumpad`, `zoomoutNumpad` items |
+| `NewAppMenu.vue` | Filter menu items có `visible: false` |
+| [renderer.ts](file:///Users/huythanh/Code/bkp/apps/studio/src-commercial/entrypoints/renderer.ts) | Thêm numpad key codes |
+| [electron-builder-config.js](file:///Users/huythanh/Code/bkp/apps/studio/electron-builder-config.js) | Fix `sign` → `signtoolOptions.sign`, fix `desktop` format |
+| [.nvmrc](file:///Users/huythanh/Code/bkp/.nvmrc) | `v20.18.0` → `v22.21.1` (đúng cho Electron 39) |
+
+---
+
+## 🔍 CI Pipeline Issues
+
+Nhìn vào các commit gần đây, bạn đã phải sửa nhiều lỗi CI liên quan Windows build:
+
+| Commit | Vấn đề |
+|--------|--------|
+| `3d7395ee3` | Fix windows build - thêm msbuild 16 toolchain |
+| `723a10ad9` | Skip workspace version rename trên Windows |
+| `51e567601` | Dùng `actions/github-script` thay PowerShell để tránh UTF-16 corruption |
+
+> [!WARNING]
+> Commit `51e567601` (mới nhất) fix lỗi PowerShell ghi file [package.json](file:///Users/huythanh/Code/bkp/package.json) bị UTF-16 BOM. Nếu [package.json](file:///Users/huythanh/Code/bkp/package.json) bị corrupt trong quá trình build, Electron sẽ **không đọc được config** → app crash khi khởi động.
+
+Các releases trên [GitHub](https://github.com/HThanh-how/bkp/releases) đều **không có file assets** → có thể build Windows chưa bao giờ thành công hoàn toàn trên CI.
+
+---
+
+## ✅ Khuyến Nghị Sửa Lỗi
+
+### Bước 1: Đảm bảo Electron version khớp upstream
+Quay lại dùng **Electron 32.2.5** và **electron-builder ~25.1.8** giống bản gốc v5.5.7:
+
+```json
+"electron": "32.2.5",
+"electron-builder": "~25.1.8",
+```
+
+Và [.nvmrc](file:///Users/huythanh/Code/bkp/.nvmrc) quay về `v20.18.0`.
+
+### Bước 2: Rebuild native modules
+Sau khi hạ Electron version:
+```bash
+cd apps/studio
+yarn install
+npx electron-builder install-app-deps
+```
+
+### Bước 3: Build lại trên Windows
+```bash
+yarn electron:build --win portable --publish never
+```
+
+### Bước 4: Kiểm tra error log
+Nếu portable exe vẫn không mở, chạy từ CMD để xem log:
+```cmd
+cd path\to\portable\extracted
+Beekeeper Studio.exe --enable-logging --v=1 2>&1
+```
+
+Hoặc kiểm tra log file tại:
+```
+%APPDATA%\beekeeper-studio\logs\main.log
+```
+
+### Bước 5 (Nếu muốn giữ Electron 39): Kiểm tra API compatibility
+Electron 32 → 39 có nhiều breaking changes. Cần kiểm tra:
+- `@electron/remote` có compatible không
+- Native modules có build đúng không
+- `electron-builder` 26 có packaging format thay đổi gì không

@@ -207,9 +207,7 @@ module.exports = {
     // FIXME: Add AppX/MSIX build back in once certificate issues resolved
     target: ['nsis', 'portable'],
     publish: ['github'],
-    signtoolOptions: {
-      sign: "./build/win/sign.js",
-    },
+    sign: "./build/win/sign.js",
   },
   portable: {
     "artifactName": "${productName}-${version}-portable.exe",
