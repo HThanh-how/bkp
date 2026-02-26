@@ -32,6 +32,12 @@ jobs:
         uses: samuelmeuli/action-snapcraft@v2
         if: "contains(matrix.os, 'ubuntu') && !contains(matrix.os, 'arm')"
 
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+        with:
+          vs-version: '16.11.14'
+        if: "startsWith(matrix.os, 'windows')"
+
       - name: Install python 3.11 (not Mac)
         uses: actions/setup-python@v5
         with:
