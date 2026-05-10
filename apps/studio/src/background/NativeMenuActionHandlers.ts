@@ -1,7 +1,8 @@
 import _ from 'lodash'
 import {AppEvent} from '../common/AppEvent'
 import { buildWindow, getActiveWindows, OpenOptions } from './WindowBuilder'
-import { app , shell } from 'electron'
+import { app } from 'electron'
+import { safeOpenExternal } from './lib/electron/safeOpenExternal'
 import platformInfo from '../common/platform_info'
 import path from 'path'
 import { IGroupedUserSettings } from '../common/appdb/models/user_setting'
@@ -66,6 +67,32 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
     if (win) await this.setZoom(win.webContents.zoomLevel - 0.5)
   }
 
+  setEditorFontSize = async (size: number): Promise<void> => {
+    const MIN_SIZE = 10
+    const MAX_SIZE = 24
+    const boundedSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, size))
+
+    this.settings.editorFontSize.value = boundedSize
+    await this.settings.editorFontSize.save()
+    getActiveWindows().forEach(window => {
+      window.send(AppEvent.settingsChanged, 'editorFontSize')
+    })
+  }
+
+  editorFontSizeReset = async (): Promise<void> => {
+    await this.setEditorFontSize(14)
+  }
+
+  editorFontSizeIncrease = async (): Promise<void> => {
+    const currentSize = (this.settings.editorFontSize?.value as number) || 14
+    await this.setEditorFontSize(currentSize + 2)
+  }
+
+  editorFontSizeDecrease = async (): Promise<void> => {
+    const currentSize = (this.settings.editorFontSize?.value as number) || 14
+    await this.setEditorFontSize(currentSize - 2)
+  }
+
   reload = async (_1: Electron.MenuItem, win: ElectronWindow): Promise<void> => {
     if (win) win.webContents.reloadIgnoringCache()
   }
@@ -86,11 +113,15 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
   }
 
   opendocs(): void {
-    shell.openExternal("https://docs.beekeeperstudio.io/")
+    safeOpenExternal("https://docs.beekeeperstudio.io/")
   }
 
   contactSupport(): void {
-    shell.openExternal("https://docs.beekeeperstudio.io/support/contact-support/")
+    safeOpenExternal("https://docs.beekeeperstudio.io/support/contact-support/")
+  }
+
+  openGettingStarted(): void {
+    safeOpenExternal("https://docs.beekeeperstudio.io/getting-started-guide/")
   }
 
   checkForUpdates(_menuItem: Electron.MenuItem, _win: Electron.BrowserWindow): void {
@@ -188,8 +219,20 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
     })
   }
 
+  togglePrivacyMode = async (): Promise<void> => {
+    this.settings.privacyMode.value = !this.settings.privacyMode.value
+    await this.settings.privacyMode.save()
+    getActiveWindows().forEach(window => {
+      window.send(AppEvent.settingsChanged)
+    })
+  }
+
   switchLicenseState = async (state: Electron.MenuItem | DevLicenseState, win: ElectronWindow) => {
     if (win) win.webContents.send(AppEvent.switchLicenseState, state)
+  }
+
+  simulatePlatform = async (platform: Electron.MenuItem | string, win: ElectronWindow) => {
+    if (win) win.webContents.send(AppEvent.simulatePlatform, platform)
   }
 
   toggleBeta = async (menuItem: Electron.MenuItem): Promise<void> => {
@@ -206,6 +249,10 @@ export default class NativeMenuActionHandlers implements IMenuActionHandler {
 
   managePlugins = (_menuItem: Electron.MenuItem, win: ElectronWindow): void => {
     if (win) win.webContents.send(AppEvent.openPluginManager);
+  }
+
+  keyboardShortcuts = (_menuItem: Electron.MenuItem, win: ElectronWindow): void => {
+    if (win) win.webContents.send(AppEvent.openKeyboardShortcuts);
   }
 
   updatePin = (_1: Electron.MenuItem, win: ElectronWindow) => {

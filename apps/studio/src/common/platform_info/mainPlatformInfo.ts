@@ -1,5 +1,6 @@
 import yargs from 'yargs-parser'
 import _ from 'lodash'
+import { existsSync } from 'fs'
 import { resolve, join } from 'path'
 import { IPlatformInfo } from '../IPlatformInfo'
 import { BksVersion } from '@/lib/license'
@@ -60,6 +61,7 @@ export function mainPlatformInfo(): IPlatformInfo {
     userDirectory = join(p.env.PORTABLE_EXECUTABLE_DIR, 'beekeeper_studio_data')
   }
   const pluginsDirectory = join(userDirectory, 'plugins')
+  const driverDepsDirectory = join(userDirectory, 'driver-deps')
 
   const sessionType = p.env.XDG_SESSION_TYPE
 
@@ -79,10 +81,15 @@ export function mainPlatformInfo(): IPlatformInfo {
     sessionType,
     isWayland: isWaylandMode(),
     isSnap: p.env.ELECTRON_SNAP,
+    isFlatpak: !!p.env.FLATPAK_ID || existsSync('/.flatpak-info'),
     isPortable: isWindows && p.env.PORTABLE_EXECUTABLE_DIR,
     isDevelopment: isDevEnv,
     isAppImage: p.env.DESKTOPINTEGRATION === 'AppImageLauncher',
     sshAuthSock: p.env.SSH_AUTH_SOCK,
+    sshConfigExists: existsSync(join(homeDirectory, '.ssh', 'config')),
+    defaultSshIdentityFile: ['id_ed25519', 'id_ecdsa', 'id_rsa', 'id_dsa']
+      .map((name) => join(homeDirectory, '.ssh', name))
+      .find((path) => existsSync(path)) || '',
     environment: p.env.NODE_ENV,
     resourcesPath,
     env: {
@@ -98,6 +105,7 @@ export function mainPlatformInfo(): IPlatformInfo {
     downloadsDirectory,
     homeDirectory,
     pluginsDirectory,
+    driverDepsDirectory,
     testMode,
     appDbPath: join(userDirectory, isDevEnv ? 'app-dev.db' : 'app.db'),
     updatesDisabled,

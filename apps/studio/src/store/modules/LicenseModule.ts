@@ -7,7 +7,6 @@ import { TransportLicenseKey } from '@/common/transport';
 import Vue from "vue"
 import { LicenseStatus } from '@/lib/license';
 import { SmartLocalStorage } from '@/common/LocalStorage';
-import globals from '@/common/globals';
 import { CloudClient } from '@/lib/cloud/CloudClient';
 
 interface State {
@@ -22,6 +21,11 @@ interface State {
 const log = rawLog.scope('LicenseModule')
 
 const oneDay = 24 * 60 * 60 * 1000; // hours*minutes*seconds*milliseconds
+
+// Coalesce overlapping dispatches so a tight loop (or a duplicate mount) can't
+// hammer the license server with identical in-flight requests.
+let inflightUpdateAll: Promise<void> | null = null
+const inflightUpdates = new Map<string, Promise<void>>()
 
 const defaultStatus = new LicenseStatus()
 Object.assign(defaultStatus, {
@@ -96,44 +100,124 @@ export const LicenseModule: Module<State, RootState>  = {
         return
       }
       await context.dispatch('sync')
-      const licenses = await Vue.prototype.$util.send('license/get')
-      if (licenses.length === 0) {
-        const autoLicense = {} as TransportLicenseKey;
-        autoLicense.key = "auto_premium";
-        autoLicense.email = "premium@beekeeper.local";
-        autoLicense.validUntil = new Date('2099-12-31');
-        autoLicense.supportUntil = new Date('2099-12-31');
-        autoLicense.maxAllowedAppRelease = null;
-        autoLicense.licenseType = "BusinessLicense";
-        await Vue.prototype.$util.send('appdb/license/save', { obj: autoLicense });
-        await context.dispatch('sync')
-      }
       const installationId = await Vue.prototype.$util.send('license/getInstallationId');
       context.commit('installationId', installationId)
       context.commit('setInitialized', true)
     },
     async add(context, { email, key, trial }) {
       if (trial) {
-        await Vue.prototype.$util.send('license/createTrialLicense')
-        await Vue.prototype.$noty.info("Your 14 day free trial has started, enjoy!")
+        try {
+          await Vue.prototype.$util.send('license/createTrialLicense')
+          await Vue.prototype.$noty.info("Your 14 day free trial has started, enjoy!")
+        } catch (error) {
+          log.error("Failed to create trial license", error)
+          await Vue.prototype.$noty.error("Unable to start trial: a license already exists")
+          return
+        }
       } else {
+        // Get the installation ID from the backend
+        const installationId = context.state.installationId
+
+        const result = await CloudClient.getLicense(
+          window.platformInfo.cloudUrl,
+          email,
+          key,
+          installationId,
+          window.platformInfo
+        );
+
+        // if we got here, license is good.
         const license = {} as TransportLicenseKey;
-        license.key = key || "premium";
+        license.key = key;
         license.email = email;
-        license.validUntil = new Date('2099-12-31');
-        license.supportUntil = new Date('2099-12-31');
-        license.maxAllowedAppRelease = null;
-        license.licenseType = "BusinessLicense";
+        license.validUntil = new Date(result.validUntil);
+        license.supportUntil = new Date(result.supportUntil);
+        license.maxAllowedAppRelease = result.maxAllowedAppRelease;
+        license.licenseType = result.licenseType;
         await Vue.prototype.$util.send('appdb/license/save', { obj: license });
       }
+      // allow emitting expired license events next time
       SmartLocalStorage.setBool('expiredLicenseEventsEmitted', false)
       await context.dispatch('sync')
     },
     async update(_context, license: TransportLicenseKey) {
-      return
+      if (license.id == null) {
+        // Saving a license without an id would INSERT a new row. The only
+        // legitimate no-id path is add(); update() should only ever see
+        // persisted rows. Offline/file-based licenses also land here with
+        // null ids, and they shouldn't be synced to the server.
+        log.warn('Skipping license update: no id on license', license.key)
+        return
+      }
+
+      const existing = inflightUpdates.get(license.key)
+      if (existing) return existing
+
+      const work = (async () => {
+        // This is to allow for dev switching
+        const isDevUpdate = window.platformInfo.isDevelopment && license.email == "fake_email";
+        try {
+          const installationId = _context.state.installationId
+
+          const data = isDevUpdate ? license : await CloudClient.getLicense(
+            window.platformInfo.cloudUrl,
+            license.email,
+            license.key,
+            installationId,
+            window.platformInfo
+          );
+
+          license.validUntil = new Date(data.validUntil)
+          license.supportUntil = new Date(data.supportUntil)
+          license.maxAllowedAppRelease = data.maxAllowedAppRelease
+          // A successful fetch clears any prior "server said this key is invalid"
+          // marker, so a key that support restores naturally re-activates.
+          license.invalidatedAt = null
+          await Vue.prototype.$util.send('appdb/license/save', { obj: license });
+        } catch (error) {
+          if (error instanceof CloudError) {
+            log.error("Cloud error on license fetch: ", error.message)
+            license.validUntil = new Date()
+            // 404 means the server no longer recognizes this key (eg support
+            // revoked it). Stamp it so the UI can surface that state; other
+            // CloudError statuses (403, etc) are auth/entitlement issues and
+            // should not set the flag.
+            if (error.status === 404) {
+              license.invalidatedAt = new Date()
+            }
+            await Vue.prototype.$util.send('appdb/license/save', { obj: license });
+          } else {
+            log.error("Problems getting license", error)
+            // eg 500 errors
+            // do nothing
+          }
+        }
+      })()
+
+      inflightUpdates.set(license.key, work)
+      try {
+        await work
+      } finally {
+        inflightUpdates.delete(license.key)
+      }
     },
     async updateAll(context) {
-      return
+      if (inflightUpdateAll) return inflightUpdateAll
+
+      const work = (async () => {
+        for (let index = 0; index < context.getters.realLicenses.length; index++) {
+          const license = context.getters.realLicenses[index];
+          await context.dispatch('update', license);
+        }
+        await context.dispatch('sync');
+      })()
+
+      inflightUpdateAll = work
+      try {
+        await work
+      } finally {
+        inflightUpdateAll = null
+      }
     },
     async remove(context, license) {
       await Vue.prototype.$util.send('license/remove', { id: license.id })

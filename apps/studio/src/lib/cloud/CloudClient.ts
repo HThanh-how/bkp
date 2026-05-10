@@ -35,6 +35,7 @@ const camelCaseData: AxiosResponseTransformer = (data) => {
 export interface CloudClientOptions {
   token: string,
   app: string,
+  clientVersion: string,
   email: string
   baseUrl: string,
   workspace?: number
@@ -64,7 +65,7 @@ export class CloudClient {
 
   public static async getLicense(baseUrl: string, email: string, key: string, installationId = "", platformInfo: IPlatformInfo) {
     const controller = new LicenseKeyController(staticAxios(baseUrl))
-    log.info("Fetching license info! Installation id", installationId)
+    log.debug("Fetching license info! Installation id", installationId)
     return await controller.get(email, key, installationId, platformInfo)
   }
 
@@ -85,7 +86,8 @@ export class CloudClient {
       headers: {
         email: options.email,
         token: options.token,
-        app: options.app
+        app: options.app,
+        clientVersion: options.clientVersion,
       },
       validateStatus: (status) => status < 500
     })

@@ -19,15 +19,15 @@
         <div class="subtitle">
           <span
             class="bastion"
-            v-if="this.config.sshBastionHost && !privacyMode"
+            v-if="displayConfig.sshBastionHost && !privacyMode"
           >
-            <span class="truncate">{{ this.config.sshBastionHost }}</span>&nbsp;>&nbsp;
+            <span class="truncate">{{ displayConfig.sshBastionHost }}</span>&nbsp;>&nbsp;
           </span>
           <span
             class="ssh"
-            v-if="this.config.sshHost && !privacyMode"
+            v-if="displayConfig.sshHost && !privacyMode"
           >
-            <span class="truncate">{{ this.config.sshHost }}</span>&nbsp;>&nbsp;
+            <span class="truncate">{{ displayConfig.sshHost }}</span>&nbsp;>&nbsp;
           </span>
           <span class="connection">
             <span>
@@ -36,7 +36,7 @@
           </span>
         </div>
       </div>
-      <span class="badge"><span>{{ config.connectionType }}</span></span>
+      <span class="badge"><span>{{ displayConfig.connectionType }}</span></span>
       <span
         v-if="!isRecentList"
         class="actions"
@@ -70,7 +70,6 @@
   </div>
 </template>
 <script>
-import _ from 'lodash'
 import TimeAgo from 'javascript-time-ago'
 import { mapGetters, mapState } from 'vuex'
 import { isUltimateType } from '@/common/interfaces/IConnection'
@@ -95,16 +94,21 @@ export default {
     ...mapState('data/connectionFolders', {'folders': 'items'}),
     ...mapGetters(['isCloud']),
     moveToOptions() {
+      const rootById = {}
+      this.folders.forEach(f => { if (!f.parentId) rootById[f.id] = f.name })
       return this.folders
-        .filter((folder) => folder.id !== this.config.connectionFolderId)
-        .map((folder) => {
-        return {
-          name: `Move to ${folder.name}`,
-          slug: `move-${folder.id}`,
-          handler: this.moveItem,
-          folder
-        }
-      })
+        .filter(folder => folder.id !== this.config.connectionFolderId)
+        .map(folder => {
+          let name
+          if (!folder.parentId) {
+            const hasSubs = this.folders.some(f => f.parentId === folder.id)
+            name = hasSubs ? `Move to ${folder.name} (top level)` : `Move to ${folder.name}`
+          } else {
+            const parentName = rootById[folder.parentId] || ''
+            name = `Move to ${parentName} \u2192 ${folder.name}`
+          }
+          return { name, slug: `move-${folder.id}`, handler: this.moveItem, folder }
+        })
     },
     classList() {
       return {
@@ -115,18 +119,18 @@ export default {
       return this.savedConnection ? this.savedConnection.labelColor : 'default'
     },
     label() {
-      if (this.savedConnection) {
+      if (this.savedConnection && this.savedConnection.name && this.savedConnection.name.trim()) {
         return this.savedConnection.name
-      } else if (this.config.connectionType === 'sqlite' || this.config.connectionType === 'libsql') {
-        return window.main.basename(this.config.defaultDatabase)
-      } else if (this.config.connectionType === 'sqlanywhere' && this.config.sqlAnywhereOptions.mode === 'file') {
-        return window.main.basename(this.config.sqlAnywhereOptions.databaseFile);
+      } else if ((this.displayConfig.connectionType === 'sqlite' || this.displayConfig.connectionType === 'libsql') && this.displayConfig.defaultDatabase) {
+        return window.main.basename(this.displayConfig.defaultDatabase)
+      } else if (this.displayConfig.connectionType === 'sqlanywhere' && this.displayConfig.sqlAnywhereOptions?.mode === 'file' && this.displayConfig.sqlAnywhereOptions?.databaseFile) {
+        return window.main.basename(this.displayConfig.sqlAnywhereOptions.databaseFile);
       }
 
-      return this.$bks.simpleConnectionString(this.config)
+      return this.$bks.simpleConnectionString(this.displayConfig)
     },
     connectionType() {
-      if (this.config.connectionType === 'sqlite' || this.config.connectionType === 'libsql') {
+      if (this.displayConfig.connectionType === 'sqlite' || this.displayConfig.connectionType === 'libsql') {
         return 'path'
       }
 
@@ -136,13 +140,13 @@ export default {
       if (this.isRecentList) {
         return this.timeAgo.format(this.config.updatedAt)
       } else {
-        return this.$bks.simpleConnectionString(this.config)
+        return this.$bks.simpleConnectionString(this.displayConfig)
       }
     },
     title() {
       return this.privacyMode ?
         'Connection details hidden by Privacy Mode' :
-        this.$bks.buildConnectionString(this.config)
+        this.$bks.buildConnectionString(this.displayConfig)
     },
     savedConnection() {
 
@@ -157,12 +161,20 @@ export default {
         return this.config
       }
     },
+    // For display purposes only: prefer the linked saved connection when this
+    // is a recent-list row, so edits to the saved connection (host, port, ssh,
+    // etc.) propagate to the recent connections list. Falls back to the
+    // used_connection snapshot when the saved connection is gone (orphan
+    // recent entry).
+    displayConfig() {
+      return this.savedConnection || this.config
+    },
   },
   methods: {
     showContextMenu(event) {
       const ultimateCheck = this.$store.getters.isUltimate
         ? true
-        : !isUltimateType(this.config.connectionType)
+        : !isUltimateType(this.displayConfig.connectionType)
 
       const options = [
         {
@@ -174,6 +186,10 @@ export default {
           name: 'Connect',
           slug: 'connect',
           handler: (blob) => this.doubleClick(blob.item)
+        },
+        !this.isRecentList && {
+          name: this.pinned ? 'Unpin' : 'Pin',
+          handler: () => this.pinned ? this.unpin() : this.pin()
         },
         {
           name: "Duplicate",
@@ -190,13 +206,12 @@ export default {
         },
       ].filter(v => v)
 
-      if (this.isCloud) {
-        options.push(...[
-          {
-            type: 'divider'
-          },
-          ...this.moveToOptions
-        ])
+      if (this.isCloud || this.folders.length > 0) {
+        options.push({ type: 'divider' })
+        if (!this.isCloud && this.config.connectionFolderId) {
+          options.push({ name: 'Move to top level', handler: () => this.moveToRoot() })
+        }
+        options.push(...this.moveToOptions)
       }
 
       this.$bks.openMenu({
@@ -205,13 +220,19 @@ export default {
         options
       })
     },
+    async moveToRoot() {
+      try {
+        await this.$store.dispatch('data/connectionFolders/moveToFolder', { connection: this.config, folder: null })
+      } catch (ex) {
+        this.$noty.error(`Move Error: ${ex.message}`)
+        console.error(ex)
+      }
+    },
     async moveItem({ item, option }) {
       try {
         const folder = option.folder
         if (!folder || !folder.id) return
-        const updated = _.clone(item)
-        updated.connectionFolderId = folder.id
-        await this.$store.dispatch('data/connections/save', updated)
+        await this.$store.dispatch('data/connectionFolders/moveToFolder', { connection: item, folder })
       } catch(ex) {
         this.$noty.error(`Move Error: ${ex.message}`)
         console.error(ex)
@@ -239,7 +260,7 @@ export default {
     },
     async copyUrl() {
       try {
-        await this.$copyText(this.$bks.buildConnectionString(this.config))
+        await this.$copyText(this.$bks.buildConnectionString(this.displayConfig))
         this.$noty.success(`The ${this.connectionType} was successfully copied!`)
       } catch (err) {
         this.$noty.success(`The ${this.connectionType} could not be copied!`)

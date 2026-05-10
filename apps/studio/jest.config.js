@@ -25,6 +25,8 @@ module.exports = {
   // support the same @ -> src alias mapping in source code
   moduleNameMapper: {
     '^@libsql/core/(.*)': resolve(__dirname, '../../node_modules/@libsql/core/lib-cjs/$1'),
+    '^@marimo-team/codemirror-languageserver$':
+      '<rootDir>/tests/__mocks__/marimo-codemirror-languageserver.js',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@shared(.*)$': '<rootDir>/src/shared/$1',
     '^@commercial(.*)$': '<rootDir>/src-commercial/$1',
@@ -52,7 +54,8 @@ module.exports = {
       require.resolve('jest-transform-stub'),
     '^.+\\.jsx?$': require.resolve('babel-jest'),
     '^.+\\.mjs$': require.resolve('babel-jest'),
-    '^.+\\.tsx?$': [require.resolve('ts-jest'), { babelConfig: true, isolatedModules: true}]
+    '^.+\\.tsx?$': [require.resolve('ts-jest'), { babelConfig: true, isolatedModules: true}],
+    '^.+\\.ini$': '<rootDir>/tests/transformers/jest-raw-text-transformer.js',
   },
   setupFilesAfterEnv: ['./tests/init/setup.js'],
   setupFiles: ['./tests/init/env-setup.js'],

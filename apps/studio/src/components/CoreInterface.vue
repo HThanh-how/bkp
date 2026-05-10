@@ -4,6 +4,7 @@
     class="interface"
     v-hotkey="keymap"
   >
+    <privacy-banner class="privacyBanner" :privacy-mode="privacyMode" />
     <div v-if="initializing">
       <progress-bar />
     </div>
@@ -67,11 +68,25 @@
   import GlobalStatusBar from './GlobalStatusBar.vue'
   import Vue from 'vue'
   import RenameDatabaseElementModal from './common/modals/RenameDatabaseElementModal.vue'
+  import PrivacyBanner from '@/components/PrivacyBanner.vue'
   import { mapGetters, mapActions, mapState } from 'vuex'
   import _ from "lodash"
 
   export default Vue.extend({
-    components: { CoreSidebar, CoreTabs, Sidebar, ExportManager, QuickSearch, ProgressBar, LostConnectionModal, RenameDatabaseElementModal, SecondarySidebar, GlobalStatusBar, GlobalSidebar },
+    components: {
+      CoreSidebar,
+      CoreTabs,
+      Sidebar,
+      ExportManager,
+      QuickSearch,
+      ProgressBar,
+      LostConnectionModal,
+      RenameDatabaseElementModal,
+      SecondarySidebar,
+      GlobalStatusBar,
+      GlobalSidebar,
+      PrivacyBanner
+    },
     data() {
       /* eslint-disable */
       return {
@@ -95,9 +110,13 @@
         "secondarySidebarWidth",
         "globalSidebarActiveItem",
       ]),
+      ...mapGetters({
+        privacyMode: 'settings/privacyMode'
+      }),
       keymap() {
         const result = this.$vHotkeyKeymap({
-          'general.openQuickSearch': this.showQuickSearch
+          'general.openQuickSearch': this.showQuickSearch,
+          'general.jsonViewerSidebar': this.toggleOpenJsonViewer,
         });
         return result;
       },
@@ -140,7 +159,6 @@
             snapOffset: [this.$bksConfig.ui.layout.primarySidebarMinWidth, 0, this.$bksConfig.ui.layout.secondarySidebarMinWidth],
             sizes: splitSizes,
             minSize: [0, this.$bksConfig.ui.layout.mainContentMinWidth, 0],
-            maxSize: [this.$bksConfig.ui.layout.primarySidebarMaxWidth, Infinity, this.$bksConfig.ui.layout.secondarySidebarMaxWidth],
             gutterSize: 5,
             elementStyle: (_dimension, elementSize, _gutterSize, index) => {
               // Check if the element is the main content
@@ -326,6 +344,10 @@
         }
 
         this.setSecondarySidebarOpen(open)
+      },
+      toggleOpenJsonViewer() {
+        this.handleToggleOpenSecondarySidebar()
+        this.trigger(AppEvent.selectSecondarySidebarTab, 'json-viewer')
       },
       handleSelectGlobalSidebarItem(item) {
         if (this.globalSidebarActiveItem === item) {
