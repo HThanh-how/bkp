@@ -87,10 +87,10 @@ describe("License", () => {
       platformInfo.parsedAppVersion = origParsedAppVersion;
     });
 
-    it("Community - No license found", async () => {
+    it("Ultimate - No license found (Auto premium)", async () => {
       expectStatus().toEqual({
-        edition: "community",
-        condition: ["No license found"],
+        edition: "ultimate",
+        condition: ["Auto premium"],
       });
     });
 
